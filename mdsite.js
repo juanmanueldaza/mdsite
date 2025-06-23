@@ -14,6 +14,7 @@
 
   function setTitle(title) {
     if (title) document.title = title;
+    console.debug('[mdsite] setTitle:', title);
   }
 
   function setupNavbar({ pdfFilename, contacts, selector, navbarOptions }) {
@@ -21,6 +22,7 @@
       console.error('mdsite: Navbar or PDF utility not loaded');
       return;
     }
+    console.debug('[mdsite] setupNavbar:', { pdfFilename, contacts, selector, navbarOptions });
     window.initDazaNavbar({
       showPdfButton: true,
       pdfCallback: () => window.DownloadPdfUtil.download({ selector, filename: pdfFilename }),
@@ -34,23 +36,39 @@
       console.error('mdsite: marked.js not loaded');
       return;
     }
+    console.debug('[mdsite] renderMarkdown: fetching', markdownUrl);
     fetch(markdownUrl)
-      .then(r => r.text())
+      .then(r => {
+        console.debug('[mdsite] fetch response:', r);
+        return r.text();
+      })
       .then(md => {
+        console.debug('[mdsite] markdown loaded:', md.slice(0, 100));
         if (typeof markdownPreprocess === 'function') md = markdownPreprocess(md);
         const el = document.querySelector(selector);
-        if (el) el.innerHTML = window.marked.parse(md);
-        else console.error('mdsite: Selector not found:', selector);
+        if (el) {
+          el.innerHTML = window.marked.parse(md);
+          console.debug('[mdsite] markdown rendered to', selector);
+        } else {
+          console.error('mdsite: Selector not found:', selector);
+        }
+      })
+      .catch(err => {
+        console.error('[mdsite] Error fetching markdown:', err);
       });
   }
 
   window.mdsiteInit = function(userConfig = {}) {
     const config = { ...DEFAULTS, ...userConfig };
+    console.debug('[mdsite] mdsiteInit config:', config);
     setTitle(config.title);
     setupNavbar(config);
     renderMarkdown(config);
   };
 
   // Auto-init if window.MdsiteConfig is present
-  if (window.MdsiteConfig) window.mdsiteInit(window.MdsiteConfig);
+  if (window.MdsiteConfig) {
+    console.debug('[mdsite] Auto-initializing with window.MdsiteConfig:', window.MdsiteConfig);
+    window.mdsiteInit(window.MdsiteConfig);
+  }
 })();
