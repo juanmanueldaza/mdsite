@@ -7,144 +7,46 @@
   <meta name="description" content="A simple static site template for Markdown content with a modern navbar and PDF export." />
   <meta name="author" content="Your Name" />
   <meta name="keywords" content="markdown, static site, template, navbar, pdf, github pages" />
-  <link rel="icon" href="https://data.daza.ar/favicon/page.png" type="image/png" />
+  <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://navbar.daza.ar/navbar.css" />
+  <link rel="stylesheet" href="mdsite.css" />
   <script src="https://navbar.daza.ar/navbar.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://navbar.daza.ar/utils/downloadPdf.js"></script>
-  <script src="https://mdsite.daza.ar/mdsite.js"></script>
-  <style>
-    :root {
-      --bg: #f6f8fa;
-      --fg: #23232e;
-      --window-bg: #fff;
-      --window-border: #e1e4e8;
-      --body-color: #23232e;
-      --heading: #23232e;
-      --link: #0366d6;
-      --link-hover: #0056b3;
-      --code-bg: #f6f8fa;
-      --blockquote: #6a737d;
-      --blockquote-border: #d1d5da;
-      --table-bg: #fff;
-      --table-border: #e1e4e8;
-      --button-bg: #f6f8fa;
-      --button-fg: #23232e;
-      --button-border: #e1e4e8;
-      --button-hover-bg: #e1e4e8;
-      --button-hover-fg: #23232e;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #2c2c32;
-        --fg: #e6e6e6;
-        --window-bg: #23232e;
-        --window-border: #222226;
-        --body-color: #e6e6e6;
-        --heading: #fff;
-        --link: #8ab4f8;
-        --link-hover: #fff;
-        --code-bg: #181a1b;
-        --blockquote: #b0b0b0;
-        --blockquote-border: #444c56;
-        --table-bg: #23232e;
-        --table-border: #444c56;
-        --button-bg: #23232e;
-        --button-fg: #e6e6e6;
-        --button-border: #444c56;
-        --button-hover-bg: #444c56;
-        --button-hover-fg: #fff;
-      }
-    }
-    body {
-      background: var(--bg);
-      color: var(--body-color);
-      font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
-      margin: 0;
-      min-height: 100vh;
-    }
-    .terminal-window {
-      max-width: 800px;
-      margin: 48px auto;
-      border-radius: 8px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-      overflow: hidden;
-      background: var(--window-bg);
-      border: 1.5px solid var(--window-border);
-    }
-    .terminal-body {
-      background: var(--window-bg);
-      color: var(--body-color);
-      font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
-      padding: 32px 32px 40px 32px;
-      min-height: 400px;
-      border-radius: 0 0 8px 8px;
-    }
-    .markdown-body {
-      background: none;
-      color: var(--body-color);
-      box-shadow: none;
-      border-radius: 0;
-    }
-    .markdown-body h1,
-    .markdown-body h2,
-    .markdown-body h3,
-    .markdown-body h4,
-    .markdown-body h5,
-    .markdown-body h6 {
-      color: var(--heading);
-      font-weight: 700;
-    }
-    .markdown-body a {
-      color: var(--link);
-    }
-    .markdown-body a:hover {
-      color: var(--link-hover);
-    }
-    .markdown-body code,
-    .markdown-body pre {
-      background: var(--code-bg);
-      color: var(--body-color);
-      border-radius: 4px;
-    }
-    .markdown-body blockquote {
-      color: var(--blockquote);
-      border-left: 0.25em solid var(--blockquote-border);
-    }
-    .markdown-body table {
-      background: var(--table-bg);
-    }
-    .markdown-body th,
-    .markdown-body td {
-      border-color: var(--table-border);
-    }
-  </style>
 </head>
 <body>
   <div id="navbar-container"></div>
   <div class="terminal-window">
     <article id="cv" class="markdown-body terminal-body"></article>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://navbar.daza.ar/utils/downloadPdf.js"></script>
   <script>
-    // Example config for mdsite
-    window.MdsiteConfig = {
-      title: 'mdsite - Markdown Static Site Template',
-      markdownUrl: 'https://mdsite.daza.ar/content.md',
-      pdfFilename: 'mdsite-export.pdf',
+    async function downloadPdf() {
+      await DownloadPdfUtil.download({
+        selector: ".terminal-window",
+        filename: "mdsite-export.pdf",
+      });
+    }
+
+    window.initDazaNavbar({
+      showPdfButton: true,
+      pdfCallback: downloadPdf,
       contacts: [
         { href: "mailto:your@email.com", icon: "fa-solid fa-envelope", label: "Email" },
         { href: "https://github.com/yourusername", icon: "fa-brands fa-github", label: "GitHub" },
         { href: "https://yourwebsite.com", icon: "fa-solid fa-globe", label: "Website" }
-      ],
-      selector: '.terminal-window',
-      // Optional: markdownPreprocess: (md) => md.replace(...)
-    };
-    // mdsite.js will auto-initialize using this config
+      ]
+    });
+
+    fetch("content.md")
+      .then((response) => response.text())
+      .then((md) => {
+        document.getElementById("cv").innerHTML = marked.parse(md);
+      });
   </script>
 </body>
 </html>
