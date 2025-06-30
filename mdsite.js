@@ -35,12 +35,34 @@ export function renderMarkdown({
   }
 }
 
+// Utility to dynamically load a script if not already present
+async function ensureScript(src, globalName) {
+  if (window[globalName]) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// Utility to load all dependencies needed by mdsite.js
+export async function ensureMdsiteDependencies() {
+  await ensureScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js', 'marked');
+  await ensureScript('https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js', 'DOMPurify');
+  await ensureScript('https://navbar.daza.ar/utils/downloadPdf.js', 'DownloadPdfUtil');
+}
+
+export { window as DownloadPdfUtil };
+
 export async function fetchAndRenderMarkdown({
   url,
   targetSelector = '#cv',
   removeContactSection = false,
   errorMessage = 'Error loading content.'
 }) {
+  await ensureMdsiteDependencies();
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch content.');
