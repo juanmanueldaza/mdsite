@@ -1,74 +1,55 @@
-// mdsite.js - Simple, clean loader for markdown-based static sites with Daza Navbar and PDF export
-// Usage: window.mdsiteInit(config)
+// Shared mdsite module for Markdown rendering, sanitization, error handling, and accessibility enhancements
+// This module will be imported by cv and onepager sites
 
-(function() {
-  const DEFAULTS = {
-    markdownUrl: 'content.md',
-    pdfFilename: 'mdsite-export.pdf',
-    contacts: [],
-    selector: '.terminal-window',
-    title: document.title,
-    navbarOptions: {},
-    markdownPreprocess: null
-  };
-
-  function setTitle(title) {
-    if (title) document.title = title;
-    console.debug('[mdsite] setTitle:', title);
+export function renderMarkdown({
+  markdown,
+  targetSelector = '#cv',
+  removeContactSection = false
+}) {
+  let md = markdown;
+  if (removeContactSection) {
+    const contactRegex = /## Contact[\s\S]*?---/;
+    md = md.replace(contactRegex, '---');
   }
-
-  function setupNavbar({ pdfFilename, contacts, selector, navbarOptions }) {
-    if (!window.initDazaNavbar || !window.DownloadPdfUtil) {
-      console.error('mdsite: Navbar or PDF utility not loaded');
-      return;
-    }
-    console.debug('[mdsite] setupNavbar:', { pdfFilename, contacts, selector, navbarOptions });
-    window.initDazaNavbar({
-      showPdfButton: true,
-      pdfCallback: () => window.DownloadPdfUtil.download({ selector, filename: pdfFilename }),
-      contacts,
-      ...navbarOptions
-    });
+  const html = window.marked.parse(md);
+  const target = document.querySelector(targetSelector);
+  target.innerHTML = window.DOMPurify.sanitize(html);
+  // Accessibility: Ensure main article is focusable and has ARIA role
+  target.setAttribute('tabindex', '0');
+  target.setAttribute('role', 'main');
+  target.setAttribute('aria-label', 'Markdown content');
+  // Accessibility: Add skip link if not present
+  if (!document.querySelector('.skip-link')) {
+    const skip = document.createElement('a');
+    skip.href = targetSelector;
+    skip.className = 'skip-link';
+    skip.textContent = 'Skip to main content';
+    skip.style.position = 'absolute';
+    skip.style.left = '-999px';
+    skip.style.top = 'auto';
+    skip.style.width = '1px';
+    skip.style.height = '1px';
+    skip.style.overflow = 'hidden';
+    skip.style.zIndex = '100';
+    document.body.insertBefore(skip, document.body.firstChild);
   }
+}
 
-  function renderMarkdown({ markdownUrl, selector, markdownPreprocess }) {
-    if (!window.marked) {
-      console.error('mdsite: marked.js not loaded');
-      return;
-    }
-    console.debug('[mdsite] renderMarkdown: fetching', markdownUrl);
-    fetch(markdownUrl)
-      .then(r => {
-        console.debug('[mdsite] fetch response:', r);
-        return r.text();
-      })
-      .then(md => {
-        console.debug('[mdsite] markdown loaded:', md.slice(0, 100));
-        if (typeof markdownPreprocess === 'function') md = markdownPreprocess(md);
-        const el = document.querySelector(selector);
-        if (el) {
-          el.innerHTML = window.marked.parse(md);
-          console.debug('[mdsite] markdown rendered to', selector);
-        } else {
-          console.error('mdsite: Selector not found:', selector);
-        }
-      })
-      .catch(err => {
-        console.error('[mdsite] Error fetching markdown:', err);
-      });
+export async function fetchAndRenderMarkdown({
+  url,
+  targetSelector = '#cv',
+  removeContactSection = false,
+  errorMessage = 'Error loading content.'
+}) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch content.');
+    const md = await response.text();
+    renderMarkdown({ markdown: md, targetSelector, removeContactSection });
+  } catch (err) {
+    const target = document.querySelector(targetSelector);
+    target.innerHTML = `<div style='color:red'>${errorMessage}: ${err.message}</div>`;
+    target.setAttribute('role', 'alert');
+    target.setAttribute('tabindex', '0');
   }
-
-  window.mdsiteInit = function(userConfig = {}) {
-    const config = { ...DEFAULTS, ...userConfig };
-    console.debug('[mdsite] mdsiteInit config:', config);
-    setTitle(config.title);
-    setupNavbar(config);
-    renderMarkdown(config);
-  };
-
-  // Auto-init if window.MdsiteConfig is present
-  if (window.MdsiteConfig) {
-    console.debug('[mdsite] Auto-initializing with window.MdsiteConfig:', window.MdsiteConfig);
-    window.mdsiteInit(window.MdsiteConfig);
-  }
-})();
+}
