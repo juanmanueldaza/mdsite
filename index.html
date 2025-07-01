@@ -23,8 +23,9 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://navbar.daza.ar/utils/downloadPdf.js"></script>
-  <script>
+  <script type="module">
+    import { DownloadPdfUtil } from 'https://navbar.daza.ar/utils/downloadPdf.js';
+
     async function downloadPdf() {
       await DownloadPdfUtil.download({
         selector: ".terminal-window",
