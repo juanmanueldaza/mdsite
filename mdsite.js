@@ -54,7 +54,18 @@ export async function ensureMdsiteDependencies() {
   await ensureScript('https://navbar.daza.ar/utils/downloadPdf.js', 'DownloadPdfUtil');
 }
 
-export { window as DownloadPdfUtil };
+// --- PDF DOWNLOAD UTILITY (ES MODULE EXPORT) ---
+export async function getDownloadPdfUtil() {
+  const mod = await import('https://navbar.daza.ar/utils/downloadPdf.js');
+  return mod.DownloadPdfUtil || mod.default;
+}
+
+export const DownloadPdfUtil = {
+  async download(options) {
+    const util = await getDownloadPdfUtil();
+    return util.download(options);
+  }
+};
 
 export async function fetchAndRenderMarkdown({
   url,
