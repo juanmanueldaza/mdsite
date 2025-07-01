@@ -20,22 +20,17 @@
   <div class="terminal-window">
     <article id="cv" class="markdown-body terminal-body"></article>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script type="module">
-    import { DownloadPdfUtil } from 'https://navbar.daza.ar/utils/downloadPdf.js';
+    import { fetchAndRenderMarkdown, ensureMdsiteDependencies, initNavbar } from "https://mdsite.daza.ar/mdsite.js";
 
-    async function downloadPdf() {
-      await DownloadPdfUtil.download({
-        selector: ".terminal-window",
-        filename: "mdsite-export.pdf",
-      });
-    }
-
-    window.initDazaNavbar({
+    await ensureMdsiteDependencies();
+    // Initialize navbar through mdsite.js (matching onepager and cv)
+    initNavbar({
       showPdfButton: true,
-      pdfCallback: downloadPdf,
+      pdfCallbackOptions: {
+        selector: ".terminal-window",
+        filename: "mdsite-export.pdf"
+      },
       contacts: [
         { href: "mailto:your@email.com", icon: "fa-solid fa-envelope", label: "Email" },
         { href: "https://github.com/yourusername", icon: "fa-brands fa-github", label: "GitHub" },
@@ -43,11 +38,10 @@
       ]
     });
 
-    fetch("content.md")
-      .then((response) => response.text())
-      .then((md) => {
-        document.getElementById("cv").innerHTML = marked.parse(md);
-      });
+    fetchAndRenderMarkdown({
+      url: "content.md",
+      targetSelector: "#cv"
+    });
   </script>
 </body>
 </html>

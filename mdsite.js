@@ -86,3 +86,16 @@ export async function fetchAndRenderMarkdown({
     target.setAttribute('tabindex', '0');
   }
 }
+
+export function initNavbar({ showPdfButton = true, pdfCallbackOptions = {}, contacts = [] }) {
+  // Dynamically load DownloadPdfUtil if needed
+  async function downloadPdf() {
+    const util = await getDownloadPdfUtil();
+    await util.download(pdfCallbackOptions);
+  }
+  window.initDazaNavbar({
+    showPdfButton,
+    pdfCallback: downloadPdf,
+    contacts
+  });
+}
