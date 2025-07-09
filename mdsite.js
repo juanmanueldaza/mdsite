@@ -405,16 +405,17 @@ export async function initMdsite(config = {}) {
     // Load and render markdown content if URL provided
     if (markdownUrl) {
       // Check if target selector exists
+      let finalTargetSelector = targetSelector;
       if (!document.querySelector(targetSelector)) {
         console.error(
           `Target selector '${targetSelector}' not found, using #content as fallback`
         );
-        targetSelector = '#content';
+        finalTargetSelector = '#content';
       }
 
       await fetchAndRenderMarkdown({
         url: markdownUrl,
-        targetSelector,
+        targetSelector: finalTargetSelector,
         removeContactSection,
         errorMessage,
       });
