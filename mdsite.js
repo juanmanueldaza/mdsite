@@ -435,13 +435,15 @@ class NavbarManager {
     this.ensureNavbarContainer();
 
     // Initialize navbar
-    const pdfCallback = showPdfButton
-      ? () =>
-          NavbarManager.handlePdfDownload({
-            filename: pdfFilename,
-            selector: pdfSelector,
-          })
-      : null;
+    let pdfCallback = null;
+    if (showPdfButton) {
+      pdfCallback = () => {
+        NavbarManager.handlePdfDownload({
+          filename: pdfFilename,
+          selector: pdfSelector,
+        });
+      };
+    }
 
     window.initDazaNavbar({
       showPdfButton,
