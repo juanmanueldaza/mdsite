@@ -42,7 +42,7 @@ class DOMUtils {
         document.addEventListener('DOMContentLoaded', resolve, { once: true });
       } else {
         // Add small delay to ensure DOM is fully ready
-        setTimeout(resolve, 10);
+        window.setTimeout(resolve, 10);
       }
     });
   }
@@ -435,15 +435,17 @@ class NavbarManager {
     this.ensureNavbarContainer();
 
     // Initialize navbar
+    const pdfCallback = showPdfButton
+      ? () =>
+          NavbarManager.handlePdfDownload({
+            filename: pdfFilename,
+            selector: pdfSelector,
+          })
+      : null;
+
     window.initDazaNavbar({
       showPdfButton,
-      pdfCallback: showPdfButton
-        ? () =>
-            NavbarManager.handlePdfDownload({
-              filename: pdfFilename,
-              selector: pdfSelector,
-            })
-        : null,
+      pdfCallback,
       contacts,
     });
   }
@@ -511,7 +513,7 @@ class MdSite {
       await this.setupPage();
       await this.loadResources();
       // Add small delay to ensure stylesheets are applied
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => window.setTimeout(resolve, 100));
       await this.initializeComponents();
 
       console.log('mdsite initialized successfully');
