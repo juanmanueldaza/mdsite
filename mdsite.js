@@ -379,8 +379,19 @@ export async function initMdsite(config = {}) {
       injectHTML(html);
     }
 
+    // Wait a moment for DOM to be ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Initialize navbar if enabled
     if (showNavbar) {
+      // Check if navbar container exists
+      if (!document.querySelector('#navbar-container')) {
+        console.error('Navbar container not found, creating it...');
+        const navbarContainer = document.createElement('div');
+        navbarContainer.id = 'navbar-container';
+        document.body.insertBefore(navbarContainer, document.body.firstChild);
+      }
+
       initNavbar({
         showPdfButton,
         pdfCallbackOptions: {
@@ -393,6 +404,14 @@ export async function initMdsite(config = {}) {
 
     // Load and render markdown content if URL provided
     if (markdownUrl) {
+      // Check if target selector exists
+      if (!document.querySelector(targetSelector)) {
+        console.error(
+          `Target selector '${targetSelector}' not found, using #content as fallback`
+        );
+        targetSelector = '#content';
+      }
+
       await fetchAndRenderMarkdown({
         url: markdownUrl,
         targetSelector,
