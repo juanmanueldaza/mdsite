@@ -71,6 +71,8 @@ export async function ensureMdsiteDependencies() {
 export const DownloadPdfUtil = {
   async download(options = {}) {
     try {
+      await ensureMdsiteDependencies();
+
       const {
         selector = 'body',
         filename = 'download.pdf',
@@ -81,10 +83,20 @@ export const DownloadPdfUtil = {
         margin = 20,
       } = options;
 
+      // Check if required libraries are loaded
+      if (!window.html2canvas) {
+        throw new Error('html2canvas library not loaded');
+      }
+      if (!window.jsPDF) {
+        throw new Error('jsPDF library not loaded');
+      }
+
       const element = document.querySelector(selector);
       if (!element) {
         throw new Error(`Element with selector "${selector}" not found`);
       }
+
+      console.log('Generating canvas from element...', element);
 
       // Create canvas from HTML element
       const canvas = await window.html2canvas(element, {
@@ -92,7 +104,7 @@ export const DownloadPdfUtil = {
         useCORS,
         allowTaint,
         backgroundColor,
-        logging: false,
+        logging: true,
         onclone: clonedDoc => {
           // Ensure styles are preserved in cloned document
           const clonedElement = clonedDoc.querySelector(selector);
@@ -103,37 +115,50 @@ export const DownloadPdfUtil = {
         },
       });
 
+      console.log('Canvas generated:', canvas.width, 'x', canvas.height);
+
       // Calculate dimensions
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       const pdfWidth = 210; // A4 width in mm
       const pdfHeight = 297; // A4 height in mm
       const ratio = Math.min(
-        (pdfWidth - margin * 2) / imgWidth,
-        (pdfHeight - margin * 2) / imgHeight
+        (pdfWidth - margin * 2) / (imgWidth * 0.75),
+        (pdfHeight - margin * 2) / (imgHeight * 0.75)
       );
 
-      // Create PDF
-      const pdf = new window.jsPDF.jsPDF({
-        orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
+      console.log('PDF dimensions calculated:', { imgWidth, imgHeight, ratio });
+
+      // Create PDF - handle different jsPDF loading patterns
+      let pdf;
+      if (window.jsPDF && window.jsPDF.jsPDF) {
+        pdf = new window.jsPDF.jsPDF({
+          orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+      } else if (window.jsPDF) {
+        pdf = new window.jsPDF({
+          orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+      } else {
+        throw new Error('jsPDF constructor not found');
+      }
+
+      console.log('PDF created:', pdf);
 
       // Add image to PDF
-      const finalWidth = imgWidth * ratio;
-      const finalHeight = imgHeight * ratio;
+      const finalWidth = imgWidth * ratio * 0.75;
+      const finalHeight = imgHeight * ratio * 0.75;
       const x = (pdf.internal.pageSize.getWidth() - finalWidth) / 2;
       const y = margin;
 
-      pdf.addImage(
-        canvas.toDataURL('image/png'),
-        'PNG',
-        x,
-        y,
-        finalWidth,
-        finalHeight
-      );
+      console.log('Adding image to PDF:', { finalWidth, finalHeight, x, y });
+
+      const imageData = canvas.toDataURL('image/png');
+      pdf.addImage(imageData, 'PNG', x, y, finalWidth, finalHeight);
 
       // Save PDF
       pdf.save(filename);
@@ -141,7 +166,7 @@ export const DownloadPdfUtil = {
       console.log(`PDF "${filename}" downloaded successfully`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
+      alert(`Error generating PDF: ${error.message}`);
     }
   },
 };
