@@ -41,7 +41,8 @@ class DOMUtils {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', resolve, { once: true });
       } else {
-        resolve();
+        // Add small delay to ensure DOM is fully ready
+        setTimeout(resolve, 10);
       }
     });
   }
@@ -125,7 +126,12 @@ class DependencyManager {
       throw new Error(`Unknown dependency: ${dep}`);
     });
 
-    await Promise.all(promises);
+    try {
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Failed to load dependencies:', error);
+      throw error;
+    }
   }
 
   static async loadStylesheets(sheets = []) {
@@ -136,7 +142,12 @@ class DependencyManager {
       throw new Error(`Unknown stylesheet: ${sheet}`);
     });
 
-    await Promise.all(promises);
+    try {
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Failed to load stylesheets:', error);
+      throw error;
+    }
   }
 }
 
@@ -160,6 +171,10 @@ class PDFGenerator {
     const element = DOMUtils.querySelector(config.selector);
     if (!element) {
       throw new Error(`Element not found: ${config.selector}`);
+    }
+
+    if (!window.html2canvas) {
+      throw new Error('html2canvas library not loaded');
     }
 
     const canvas = await window.html2canvas(element, {
@@ -235,6 +250,14 @@ class MarkdownRenderer {
     };
 
     await DependencyManager.loadDependencies(['marked', 'DOMPurify']);
+
+    if (!window.marked) {
+      throw new Error('marked library not loaded');
+    }
+
+    if (!window.DOMPurify) {
+      throw new Error('DOMPurify library not loaded');
+    }
 
     let processedMarkdown = markdown;
     if (config.removeContactSection) {
@@ -404,6 +427,10 @@ class NavbarManager {
       'initDazaNavbar'
     );
 
+    if (!window.initDazaNavbar) {
+      throw new Error('Navbar library not loaded');
+    }
+
     // Ensure container exists
     this.ensureNavbarContainer();
 
@@ -412,7 +439,7 @@ class NavbarManager {
       showPdfButton,
       pdfCallback: showPdfButton
         ? () =>
-            this.handlePdfDownload({
+            NavbarManager.handlePdfDownload({
               filename: pdfFilename,
               selector: pdfSelector,
             })
@@ -483,11 +510,15 @@ class MdSite {
       await DOMUtils.waitForDOM();
       await this.setupPage();
       await this.loadResources();
+      // Add small delay to ensure stylesheets are applied
+      await new Promise(resolve => setTimeout(resolve, 100));
       await this.initializeComponents();
 
       console.log('mdsite initialized successfully');
     } catch (error) {
       console.error('Error initializing mdsite:', error);
+      // Render error to page if possible
+      this.renderInitializationError(error);
       throw error;
     }
   }
@@ -521,6 +552,23 @@ class MdSite {
         removeContactSection: this.config.removeContactSection,
         errorMessage: this.config.errorMessage,
       });
+    }
+  }
+
+  renderInitializationError(error) {
+    try {
+      document.body.innerHTML = `
+        <div style="padding: 20px; background: #ffe6e6; border: 1px solid red; margin: 20px; border-radius: 4px;">
+          <h2>mdsite Initialization Error</h2>
+          <p><strong>Error:</strong> ${error.message}</p>
+          <details>
+            <summary>Stack Trace</summary>
+            <pre>${error.stack || 'No stack trace available'}</pre>
+          </details>
+        </div>
+      `;
+    } catch (renderError) {
+      console.error('Could not render error to page:', renderError);
     }
   }
 }

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mdsite Test</title>
+</head>
+<body>
+    <script type="module">
+        import { initMdsite } from './mdsite.js';
+
+        // Test configuration
+        const config = {
+            title: 'Test Page',
+            description: 'Testing mdsite functionality',
+            author: 'Test Author',
+            keywords: 'test, mdsite, functionality',
+
+            markdownUrl: 'https://data.daza.ar/md/one-pager.md',
+            targetSelector: '#content',
+            removeContactSection: true,
+            errorMessage: 'Test Error Loading',
+
+            showNavbar: true,
+            showPdfButton: true,
+            pdfFilename: 'test.pdf',
+            pdfSelector: '.terminal-window',
+
+            contacts: [
+                {
+                    href: 'mailto:test@example.com',
+                    icon: 'fa-solid fa-envelope',
+                    label: 'Email'
+                }
+            ],
+
+            useTerminalStyle: true,
+            loadFontAwesome: true,
+            loadGitHubMarkdownCSS: true,
+            loadFiraMonoFont: true,
+
+            customCSS: `
+                .test-indicator {
+                    position: fixed;
+                    top: 10px;
+                    right: 10px;
+                    background: green;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    z-index: 9999;
+                }
+            `
+        };
+
+        // Initialize and test
+        try {
+            console.log('Starting mdsite test...');
+            await initMdsite(config);
+
+            // Add success indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'test-indicator';
+            indicator.textContent = 'mdsite OK';
+            document.body.appendChild(indicator);
+
+            console.log('mdsite test completed successfully');
+        } catch (error) {
+            console.error('mdsite test failed:', error);
+
+            // Add error indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'test-indicator';
+            indicator.style.background = 'red';
+            indicator.textContent = 'mdsite ERROR';
+            document.body.appendChild(indicator);
+
+            // Show error details
+            document.body.innerHTML += `
+                <div style="padding: 20px; background: #ffe6e6; border: 1px solid red; margin: 20px;">
+                    <h2>Test Failed</h2>
+                    <pre>${error.stack || error.message}</pre>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
