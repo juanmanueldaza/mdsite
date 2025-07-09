@@ -81,7 +81,7 @@ export const DownloadPdfUtil = {
         allowTaint = true,
         backgroundColor = '#ffffff',
         margin = 10,
-        quality = 0.8,
+        quality = 1,
       } = options;
 
       // Check if required libraries are loaded
@@ -212,4 +212,198 @@ export function initNavbar({
     pdfCallback: downloadPdf,
     contacts,
   });
+}
+
+// Utility to inject CSS into the page
+function injectCSS(css) {
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+
+// Utility to inject HTML structure into the page
+function injectHTML(html) {
+  document.body.innerHTML = html;
+}
+
+// Utility to load external stylesheets
+async function loadStylesheet(href) {
+  return new Promise((resolve, reject) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.onload = resolve;
+    link.onerror = reject;
+    document.head.appendChild(link);
+  });
+}
+
+// Comprehensive initialization function
+export async function initMdsite(config = {}) {
+  const {
+    // Page configuration
+    title = 'mdsite',
+    description = 'A markdown-based site',
+    author = 'Author',
+    keywords = 'markdown, site',
+
+    // Content configuration
+    markdownUrl,
+    targetSelector = '#content',
+    removeContactSection = false,
+    errorMessage = 'Error loading content',
+
+    // Navbar configuration
+    showNavbar = true,
+    showPdfButton = true,
+    pdfFilename = 'document.pdf',
+    pdfSelector = '.terminal-window',
+    contacts = [],
+
+    // Styling configuration
+    useTerminalStyle = true,
+    customCSS = '',
+
+    // External dependencies
+    loadFontAwesome = true,
+    loadGitHubMarkdownCSS = true,
+    loadFiraMonoFont = true,
+  } = config;
+
+  try {
+    // Set page title and meta tags
+    document.title = title;
+
+    // Add meta tags if they don't exist
+    if (!document.querySelector('meta[name="description"]')) {
+      const descMeta = document.createElement('meta');
+      descMeta.name = 'description';
+      descMeta.content = description;
+      document.head.appendChild(descMeta);
+    }
+
+    if (!document.querySelector('meta[name="author"]')) {
+      const authorMeta = document.createElement('meta');
+      authorMeta.name = 'author';
+      authorMeta.content = author;
+      document.head.appendChild(authorMeta);
+    }
+
+    if (!document.querySelector('meta[name="keywords"]')) {
+      const keywordsMeta = document.createElement('meta');
+      keywordsMeta.name = 'keywords';
+      keywordsMeta.content = keywords;
+      document.head.appendChild(keywordsMeta);
+    }
+
+    // Add viewport meta if not present
+    if (!document.querySelector('meta[name="viewport"]')) {
+      const viewportMeta = document.createElement('meta');
+      viewportMeta.name = 'viewport';
+      viewportMeta.content = 'width=device-width, initial-scale=1.0';
+      document.head.appendChild(viewportMeta);
+    }
+
+    // Add favicon if not present
+    if (!document.querySelector('link[rel="icon"]')) {
+      const favicon = document.createElement('link');
+      favicon.rel = 'icon';
+      favicon.href = 'https://data.daza.ar/favicon/page.png';
+      favicon.type = 'image/png';
+      document.head.appendChild(favicon);
+    }
+
+    // Load external stylesheets
+    const stylesheetPromises = [];
+
+    if (loadGitHubMarkdownCSS) {
+      stylesheetPromises.push(
+        loadStylesheet(
+          'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css'
+        )
+      );
+    }
+
+    if (loadFontAwesome) {
+      stylesheetPromises.push(
+        loadStylesheet(
+          'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        )
+      );
+    }
+
+    if (loadFiraMonoFont) {
+      stylesheetPromises.push(
+        loadStylesheet(
+          'https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&display=swap'
+        )
+      );
+    }
+
+    if (showNavbar) {
+      stylesheetPromises.push(
+        loadStylesheet('https://navbar.daza.ar/navbar.css')
+      );
+
+      // Load navbar script
+      await ensureScript('https://navbar.daza.ar/navbar.js', 'initDazaNavbar');
+    }
+
+    // Wait for all stylesheets to load
+    await Promise.all(stylesheetPromises);
+
+    // Inject mdsite CSS if using terminal style
+    if (useTerminalStyle) {
+      const mdsiteCSS = await fetch('https://mdsite.daza.ar/mdsite.css').then(
+        r => r.text()
+      );
+      injectCSS(mdsiteCSS);
+    }
+
+    // Inject custom CSS if provided
+    if (customCSS) {
+      injectCSS(customCSS);
+    }
+
+    // Create HTML structure if body is empty or minimal
+    if (
+      document.body.children.length === 0 ||
+      document.body.innerHTML.trim() === ''
+    ) {
+      const html = `
+        ${showNavbar ? '<div id="navbar-container"></div>' : ''}
+        <div class="terminal-window">
+          <article id="content" class="markdown-body terminal-body"></article>
+        </div>
+      `;
+      injectHTML(html);
+    }
+
+    // Initialize navbar if enabled
+    if (showNavbar) {
+      initNavbar({
+        showPdfButton,
+        pdfCallbackOptions: {
+          selector: pdfSelector,
+          filename: pdfFilename,
+        },
+        contacts,
+      });
+    }
+
+    // Load and render markdown content if URL provided
+    if (markdownUrl) {
+      await fetchAndRenderMarkdown({
+        url: markdownUrl,
+        targetSelector,
+        removeContactSection,
+        errorMessage,
+      });
+    }
+
+    console.log('mdsite initialized successfully');
+  } catch (error) {
+    console.error('Error initializing mdsite:', error);
+    throw error;
+  }
 }
