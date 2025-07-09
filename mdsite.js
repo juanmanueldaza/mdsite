@@ -4,7 +4,7 @@
 export function renderMarkdown({
   markdown,
   targetSelector = '#cv',
-  removeContactSection = false
+  removeContactSection = false,
 }) {
   let md = markdown;
   if (removeContactSection) {
@@ -49,29 +49,108 @@ async function ensureScript(src, globalName) {
 
 // Utility to load all dependencies needed by mdsite.js
 export async function ensureMdsiteDependencies() {
-  await ensureScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js', 'marked');
-  await ensureScript('https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js', 'DOMPurify');
-  await ensureScript('https://navbar.daza.ar/utils/downloadPdf.js', 'DownloadPdfUtil');
+  await ensureScript(
+    'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
+    'marked'
+  );
+  await ensureScript(
+    'https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js',
+    'DOMPurify'
+  );
+  await ensureScript(
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'jsPDF'
+  );
+  await ensureScript(
+    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+    'html2canvas'
+  );
 }
 
 // --- PDF DOWNLOAD UTILITY (ES MODULE EXPORT) ---
-export async function getDownloadPdfUtil() {
-  const mod = await import('https://navbar.daza.ar/utils/downloadPdf.js');
-  return mod.DownloadPdfUtil || mod.default;
-}
-
 export const DownloadPdfUtil = {
-  async download(options) {
-    const util = await getDownloadPdfUtil();
-    return util.download(options);
-  }
+  async download(options = {}) {
+    try {
+      const {
+        selector = 'body',
+        filename = 'download.pdf',
+        scale = 2,
+        useCORS = true,
+        allowTaint = true,
+        backgroundColor = '#ffffff',
+        margin = 20,
+      } = options;
+
+      const element = document.querySelector(selector);
+      if (!element) {
+        throw new Error(`Element with selector "${selector}" not found`);
+      }
+
+      // Create canvas from HTML element
+      const canvas = await window.html2canvas(element, {
+        scale,
+        useCORS,
+        allowTaint,
+        backgroundColor,
+        logging: false,
+        onclone: clonedDoc => {
+          // Ensure styles are preserved in cloned document
+          const clonedElement = clonedDoc.querySelector(selector);
+          if (clonedElement) {
+            clonedElement.style.transform = 'scale(1)';
+            clonedElement.style.transformOrigin = 'top left';
+          }
+        },
+      });
+
+      // Calculate dimensions
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const pdfWidth = 210; // A4 width in mm
+      const pdfHeight = 297; // A4 height in mm
+      const ratio = Math.min(
+        (pdfWidth - margin * 2) / imgWidth,
+        (pdfHeight - margin * 2) / imgHeight
+      );
+
+      // Create PDF
+      const pdf = new window.jsPDF.jsPDF({
+        orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Add image to PDF
+      const finalWidth = imgWidth * ratio;
+      const finalHeight = imgHeight * ratio;
+      const x = (pdf.internal.pageSize.getWidth() - finalWidth) / 2;
+      const y = margin;
+
+      pdf.addImage(
+        canvas.toDataURL('image/png'),
+        'PNG',
+        x,
+        y,
+        finalWidth,
+        finalHeight
+      );
+
+      // Save PDF
+      pdf.save(filename);
+
+      console.log(`PDF "${filename}" downloaded successfully`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  },
 };
 
 export async function fetchAndRenderMarkdown({
   url,
   targetSelector = '#cv',
   removeContactSection = false,
-  errorMessage = 'Error loading content.'
+  errorMessage = 'Error loading content.',
 }) {
   await ensureMdsiteDependencies();
   try {
@@ -87,15 +166,18 @@ export async function fetchAndRenderMarkdown({
   }
 }
 
-export function initNavbar({ showPdfButton = true, pdfCallbackOptions = {}, contacts = [] }) {
-  // Dynamically load DownloadPdfUtil if needed
+export function initNavbar({
+  showPdfButton = true,
+  pdfCallbackOptions = {},
+  contacts = [],
+}) {
+  // Use our built-in PDF utility
   async function downloadPdf() {
-    const util = await getDownloadPdfUtil();
-    await util.download(pdfCallbackOptions);
+    await DownloadPdfUtil.download(pdfCallbackOptions);
   }
   window.initDazaNavbar({
     showPdfButton,
     pdfCallback: downloadPdf,
-    contacts
+    contacts,
   });
 }

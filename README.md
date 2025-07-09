@@ -2,6 +2,8 @@
 
 A simple, modern static site template for Markdown content with a beautiful navbar and PDF export. Perfect for personal sites, documentation, or quick publishing on GitHub Pages.
 
+> **📁 Part of the daza.ar Ecosystem**: This repository is part of the [daza.ar-env](https://github.com/juanmanueldaza/daza.ar-env) development environment. For local development setup, unified workflow, and cross-site documentation, see the [main repository](https://github.com/juanmanueldaza/daza.ar-env).
+
 ## Features
 - Write your content in Markdown (`content.md`)
 - Clean, responsive design
@@ -75,6 +77,23 @@ mdsite/
 ├── mdsite.js       # (optional) JS loader (not required for basic use)
 └── README.md       # This file
 ```
+
+## 🏗️ Ecosystem
+
+This mdsite template is part of the **daza.ar ecosystem**:
+
+- **🛠️ Development Environment**: [daza.ar-env](https://github.com/juanmanueldaza/daza.ar-env) - Unified development setup for all sites
+- **📋 Contributing**: Follow the branch workflow in [daza.ar-env/CONTRIBUTING.md](https://github.com/juanmanueldaza/daza.ar-env/blob/main/CONTRIBUTING.md)
+- **🎯 Issues & Features**: Use the [feature_improvement.md](https://github.com/juanmanueldaza/daza.ar-env/blob/main/.github/ISSUE_TEMPLATE/feature_improvement.md) template
+- **🏗️ Architecture**: See [deployment documentation](https://github.com/juanmanueldaza/daza.ar-env/blob/main/docs/DEPLOYMENT.md) for the full ecosystem architecture
+
+### Related Sites
+- **📄 CV Site**: [cv.daza.ar](https://cv.daza.ar) - Uses this mdsite.js module
+- **📋 Onepager**: [onepager.daza.ar](https://onepager.daza.ar) - Uses this mdsite.js module
+- **🧭 Navbar**: [navbar.daza.ar](https://navbar.daza.ar) - Navigation component used by mdsite
+- **📊 Data**: [data.daza.ar](https://data.daza.ar) - Content and data repository
+- **🏠 Start Page**: [start.daza.ar](https://start.daza.ar) - Personal dashboard
+- **🖼️ Wallpapers**: [wallpapers.daza.ar](https://wallpapers.daza.ar) - Wallpaper collection
 
 ## Credits
 - [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css)
