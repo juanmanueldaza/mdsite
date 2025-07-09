@@ -41,8 +41,14 @@ async function ensureScript(src, globalName) {
   await new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
+    s.onload = () => {
+      console.log(`Loaded script: ${src}`);
+      resolve();
+    };
+    s.onerror = err => {
+      console.error(`Failed to load script: ${src}`, err);
+      reject(err);
+    };
     document.head.appendChild(s);
   });
 }
@@ -59,7 +65,7 @@ export async function ensureMdsiteDependencies() {
   );
   await ensureScript(
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    'jsPDF'
+    'jspdf'
   );
   await ensureScript(
     'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
@@ -87,7 +93,18 @@ export const DownloadPdfUtil = {
       if (!window.html2canvas) {
         throw new Error('html2canvas library not loaded');
       }
-      if (!window.jsPDF) {
+
+      // Debug: Check what jsPDF globals are available
+      console.log('Available jsPDF globals:', {
+        jspdf: !!window.jspdf,
+        jsPDF: !!window.jsPDF,
+        'jspdf.jsPDF': !!(window.jspdf && window.jspdf.jsPDF),
+        'jsPDF.jsPDF': !!(window.jsPDF && window.jsPDF.jsPDF),
+        'window.jspdf': window.jspdf,
+        'window.jsPDF': window.jsPDF,
+      });
+
+      if (!window.jspdf && !window.jsPDF) {
         throw new Error('jsPDF library not loaded');
       }
 
@@ -131,7 +148,13 @@ export const DownloadPdfUtil = {
 
       // Create PDF - handle different jsPDF loading patterns
       let pdf;
-      if (window.jsPDF && window.jsPDF.jsPDF) {
+      if (window.jspdf && window.jspdf.jsPDF) {
+        pdf = new window.jspdf.jsPDF({
+          orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+      } else if (window.jsPDF && window.jsPDF.jsPDF) {
         pdf = new window.jsPDF.jsPDF({
           orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
           unit: 'mm',
