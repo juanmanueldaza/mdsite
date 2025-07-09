@@ -41,14 +41,8 @@ async function ensureScript(src, globalName) {
   await new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = src;
-    s.onload = () => {
-      console.log(`Loaded script: ${src}`);
-      resolve();
-    };
-    s.onerror = err => {
-      console.error(`Failed to load script: ${src}`, err);
-      reject(err);
-    };
+    s.onload = resolve;
+    s.onerror = reject;
     document.head.appendChild(s);
   });
 }
@@ -82,27 +76,18 @@ export const DownloadPdfUtil = {
       const {
         selector = 'body',
         filename = 'download.pdf',
-        scale = 2,
+        scale = 1,
         useCORS = true,
         allowTaint = true,
         backgroundColor = '#ffffff',
-        margin = 20,
+        margin = 10,
+        quality = 0.8,
       } = options;
 
       // Check if required libraries are loaded
       if (!window.html2canvas) {
         throw new Error('html2canvas library not loaded');
       }
-
-      // Debug: Check what jsPDF globals are available
-      console.log('Available jsPDF globals:', {
-        jspdf: !!window.jspdf,
-        jsPDF: !!window.jsPDF,
-        'jspdf.jsPDF': !!(window.jspdf && window.jspdf.jsPDF),
-        'jsPDF.jsPDF': !!(window.jsPDF && window.jsPDF.jsPDF),
-        'window.jspdf': window.jspdf,
-        'window.jsPDF': window.jsPDF,
-      });
 
       if (!window.jspdf && !window.jsPDF) {
         throw new Error('jsPDF library not loaded');
@@ -113,15 +98,15 @@ export const DownloadPdfUtil = {
         throw new Error(`Element with selector "${selector}" not found`);
       }
 
-      console.log('Generating canvas from element...', element);
-
       // Create canvas from HTML element
       const canvas = await window.html2canvas(element, {
         scale,
         useCORS,
         allowTaint,
         backgroundColor,
-        logging: true,
+        logging: false,
+        width: element.scrollWidth,
+        height: element.scrollHeight,
         onclone: clonedDoc => {
           // Ensure styles are preserved in cloned document
           const clonedElement = clonedDoc.querySelector(selector);
@@ -132,19 +117,21 @@ export const DownloadPdfUtil = {
         },
       });
 
-      console.log('Canvas generated:', canvas.width, 'x', canvas.height);
-
       // Calculate dimensions
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       const pdfWidth = 210; // A4 width in mm
       const pdfHeight = 297; // A4 height in mm
-      const ratio = Math.min(
-        (pdfWidth - margin * 2) / (imgWidth * 0.75),
-        (pdfHeight - margin * 2) / (imgHeight * 0.75)
-      );
 
-      console.log('PDF dimensions calculated:', { imgWidth, imgHeight, ratio });
+      // Convert pixels to mm (roughly 3.78 pixels per mm at 96 DPI)
+      const pxToMm = 0.264583;
+      const availableWidth = pdfWidth - margin * 2;
+      const availableHeight = pdfHeight - margin * 2;
+
+      const ratio = Math.min(
+        availableWidth / (imgWidth * pxToMm),
+        availableHeight / (imgHeight * pxToMm)
+      );
 
       // Create PDF - handle different jsPDF loading patterns
       let pdf;
@@ -170,18 +157,15 @@ export const DownloadPdfUtil = {
         throw new Error('jsPDF constructor not found');
       }
 
-      console.log('PDF created:', pdf);
-
       // Add image to PDF
-      const finalWidth = imgWidth * ratio * 0.75;
-      const finalHeight = imgHeight * ratio * 0.75;
+      const finalWidth = imgWidth * pxToMm * ratio;
+      const finalHeight = imgHeight * pxToMm * ratio;
       const x = (pdf.internal.pageSize.getWidth() - finalWidth) / 2;
       const y = margin;
 
-      console.log('Adding image to PDF:', { finalWidth, finalHeight, x, y });
-
-      const imageData = canvas.toDataURL('image/png');
-      pdf.addImage(imageData, 'PNG', x, y, finalWidth, finalHeight);
+      // Use JPEG with quality setting to reduce file size
+      const imageData = canvas.toDataURL('image/jpeg', quality);
+      pdf.addImage(imageData, 'JPEG', x, y, finalWidth, finalHeight);
 
       // Save PDF
       pdf.save(filename);
