@@ -1,429 +1,553 @@
-// Shared mdsite module for Markdown rendering, sanitization, error handling, and accessibility enhancements
-// This module will be imported by cv and onepager sites
+// mdsite.js - Modern, Clean, SOLID-compliant markdown site generator
+// Dependencies: marked, DOMPurify, jsPDF, html2canvas (loaded dynamically)
 
-export function renderMarkdown({
-  markdown,
-  targetSelector = '#cv',
-  removeContactSection = false,
-}) {
-  let md = markdown;
-  if (removeContactSection) {
-    const contactRegex = /## Contact[\s\S]*?---/;
-    md = md.replace(contactRegex, '---');
+/**
+ * Utility class for DOM operations
+ */
+class DOMUtils {
+  static createElement(tag, attributes = {}, content = '') {
+    const element = document.createElement(tag);
+    Object.assign(element, attributes);
+    if (content) element.textContent = content;
+    return element;
   }
-  const html = window.marked.parse(md);
-  const target = document.querySelector(targetSelector);
-  target.innerHTML = window.DOMPurify.sanitize(html);
-  // Accessibility: Ensure main article is focusable and has ARIA role
-  target.setAttribute('tabindex', '0');
-  target.setAttribute('role', 'main');
-  target.setAttribute('aria-label', 'Markdown content');
-  // Accessibility: Add skip link if not present
-  if (!document.querySelector('.skip-link')) {
-    const skip = document.createElement('a');
-    skip.href = targetSelector;
-    skip.className = 'skip-link';
-    skip.textContent = 'Skip to main content';
-    skip.style.position = 'absolute';
-    skip.style.left = '-999px';
-    skip.style.top = 'auto';
-    skip.style.width = '1px';
-    skip.style.height = '1px';
-    skip.style.overflow = 'hidden';
-    skip.style.zIndex = '100';
-    document.body.insertBefore(skip, document.body.firstChild);
+
+  static querySelector(selector) {
+    return document.querySelector(selector);
   }
-}
 
-// Utility to dynamically load a script if not already present
-async function ensureScript(src, globalName) {
-  if (window[globalName]) return;
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-// Utility to load all dependencies needed by mdsite.js
-export async function ensureMdsiteDependencies() {
-  await ensureScript(
-    'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
-    'marked'
-  );
-  await ensureScript(
-    'https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js',
-    'DOMPurify'
-  );
-  await ensureScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    'jspdf'
-  );
-  await ensureScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-    'html2canvas'
-  );
-}
-
-// --- PDF DOWNLOAD UTILITY (ES MODULE EXPORT) ---
-export const DownloadPdfUtil = {
-  async download(options = {}) {
-    try {
-      await ensureMdsiteDependencies();
-
-      const {
-        selector = 'body',
-        filename = 'download.pdf',
-        scale = 1,
-        useCORS = true,
-        allowTaint = true,
-        backgroundColor = '#ffffff',
-        margin = 10,
-        quality = 1,
-      } = options;
-
-      // Check if required libraries are loaded
-      if (!window.html2canvas) {
-        throw new Error('html2canvas library not loaded');
-      }
-
-      if (!window.jspdf && !window.jsPDF) {
-        throw new Error('jsPDF library not loaded');
-      }
-
-      const element = document.querySelector(selector);
-      if (!element) {
-        throw new Error(`Element with selector "${selector}" not found`);
-      }
-
-      // Create canvas from HTML element
-      const canvas = await window.html2canvas(element, {
-        scale,
-        useCORS,
-        allowTaint,
-        backgroundColor,
-        logging: false,
-        width: element.scrollWidth,
-        height: element.scrollHeight,
-        onclone: clonedDoc => {
-          // Ensure styles are preserved in cloned document
-          const clonedElement = clonedDoc.querySelector(selector);
-          if (clonedElement) {
-            clonedElement.style.transform = 'scale(1)';
-            clonedElement.style.transformOrigin = 'top left';
-          }
-        },
-      });
-
-      // Calculate dimensions
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const pdfWidth = 210; // A4 width in mm
-      const pdfHeight = 297; // A4 height in mm
-
-      // Convert pixels to mm (roughly 3.78 pixels per mm at 96 DPI)
-      const pxToMm = 0.264583;
-      const availableWidth = pdfWidth - margin * 2;
-      const availableHeight = pdfHeight - margin * 2;
-
-      const ratio = Math.min(
-        availableWidth / (imgWidth * pxToMm),
-        availableHeight / (imgHeight * pxToMm)
-      );
-
-      // Create PDF - handle different jsPDF loading patterns
-      let pdf;
-      if (window.jspdf && window.jspdf.jsPDF) {
-        pdf = new window.jspdf.jsPDF({
-          orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
-          unit: 'mm',
-          format: 'a4',
-        });
-      } else if (window.jsPDF && window.jsPDF.jsPDF) {
-        pdf = new window.jsPDF.jsPDF({
-          orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
-          unit: 'mm',
-          format: 'a4',
-        });
-      } else if (window.jsPDF) {
-        pdf = new window.jsPDF({
-          orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
-          unit: 'mm',
-          format: 'a4',
-        });
-      } else {
-        throw new Error('jsPDF constructor not found');
-      }
-
-      // Add image to PDF
-      const finalWidth = imgWidth * pxToMm * ratio;
-      const finalHeight = imgHeight * pxToMm * ratio;
-      const x = (pdf.internal.pageSize.getWidth() - finalWidth) / 2;
-      const y = margin;
-
-      // Use JPEG with quality setting to reduce file size
-      const imageData = canvas.toDataURL('image/jpeg', quality);
-      pdf.addImage(imageData, 'JPEG', x, y, finalWidth, finalHeight);
-
-      // Save PDF
-      pdf.save(filename);
-
-      console.log(`PDF "${filename}" downloaded successfully`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert(`Error generating PDF: ${error.message}`);
-    }
-  },
-};
-
-export async function fetchAndRenderMarkdown({
-  url,
-  targetSelector = '#cv',
-  removeContactSection = false,
-  errorMessage = 'Error loading content.',
-}) {
-  await ensureMdsiteDependencies();
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch content.');
-    const md = await response.text();
-    renderMarkdown({ markdown: md, targetSelector, removeContactSection });
-  } catch (err) {
-    const target = document.querySelector(targetSelector);
-    target.innerHTML = `<div style='color:red'>${errorMessage}: ${err.message}</div>`;
-    target.setAttribute('role', 'alert');
-    target.setAttribute('tabindex', '0');
+  static createStyleElement(css) {
+    const style = document.createElement('style');
+    style.textContent = css;
+    return style;
   }
-}
 
-export function initNavbar({
-  showPdfButton = true,
-  pdfCallbackOptions = {},
-  contacts = [],
-}) {
-  // Use our built-in PDF utility
-  async function downloadPdf() {
-    await DownloadPdfUtil.download(pdfCallbackOptions);
-  }
-  window.initDazaNavbar({
-    showPdfButton,
-    pdfCallback: downloadPdf,
-    contacts,
-  });
-}
-
-// Utility to inject CSS into the page
-function injectCSS(css) {
-  const style = document.createElement('style');
-  style.textContent = css;
-  document.head.appendChild(style);
-}
-
-// Utility to inject HTML structure into the page
-function injectHTML(html) {
-  document.body.innerHTML = html;
-}
-
-// Utility to load external stylesheets
-async function loadStylesheet(href) {
-  return new Promise((resolve, reject) => {
+  static createLinkElement(href, rel = 'stylesheet') {
     const link = document.createElement('link');
-    link.rel = 'stylesheet';
     link.href = href;
-    link.onload = resolve;
-    link.onerror = reject;
-    document.head.appendChild(link);
-  });
+    link.rel = rel;
+    return link;
+  }
+
+  static createMetaElement(name, content) {
+    const meta = document.createElement('meta');
+    meta.name = name;
+    meta.content = content;
+    return meta;
+  }
+
+  static waitForDOM() {
+    return new Promise(resolve => {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', resolve, { once: true });
+      } else {
+        resolve();
+      }
+    });
+  }
 }
 
-// Comprehensive initialization function
-export async function initMdsite(config = {}) {
-  const {
-    // Page configuration
-    title = 'mdsite',
-    description = 'A markdown-based site',
-    author = 'Author',
-    keywords = 'markdown, site',
+/**
+ * Script loader utility
+ */
+class ScriptLoader {
+  static loadedScripts = new Set();
 
-    // Content configuration
-    markdownUrl,
-    targetSelector = '#content',
-    removeContactSection = false,
-    errorMessage = 'Error loading content',
+  static async loadScript(src, globalName = null) {
+    if (this.loadedScripts.has(src)) {
+      return;
+    }
 
-    // Navbar configuration
-    showNavbar = true,
-    showPdfButton = true,
-    pdfFilename = 'document.pdf',
-    pdfSelector = '.terminal-window',
-    contacts = [],
+    if (globalName && window[globalName]) {
+      this.loadedScripts.add(src);
+      return;
+    }
 
-    // Styling configuration
-    useTerminalStyle = true,
-    customCSS = '',
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => {
+        this.loadedScripts.add(src);
+        resolve();
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
 
-    // External dependencies
-    loadFontAwesome = true,
-    loadGitHubMarkdownCSS = true,
-    loadFiraMonoFont = true,
-  } = config;
+  static async loadStylesheet(href) {
+    if (this.loadedScripts.has(href)) {
+      return;
+    }
 
-  try {
-    // Set page title and meta tags
+    return new Promise((resolve, reject) => {
+      const link = DOMUtils.createLinkElement(href);
+      link.onload = () => {
+        this.loadedScripts.add(href);
+        resolve();
+      };
+      link.onerror = reject;
+      document.head.appendChild(link);
+    });
+  }
+}
+
+/**
+ * Dependency manager for external libraries
+ */
+class DependencyManager {
+  static dependencies = {
+    marked: 'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
+    DOMPurify:
+      'https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js',
+    jsPDF:
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    html2canvas:
+      'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  };
+
+  static stylesheets = {
+    githubMarkdown:
+      'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css',
+    fontAwesome:
+      'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    firaFont:
+      'https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&display=swap',
+    navbar: 'https://navbar.daza.ar/navbar.css',
+    mdsite: 'https://mdsite.daza.ar/mdsite.css',
+  };
+
+  static async loadDependencies(deps = []) {
+    const promises = deps.map(dep => {
+      if (this.dependencies[dep]) {
+        return ScriptLoader.loadScript(this.dependencies[dep], dep);
+      }
+      throw new Error(`Unknown dependency: ${dep}`);
+    });
+
+    await Promise.all(promises);
+  }
+
+  static async loadStylesheets(sheets = []) {
+    const promises = sheets.map(sheet => {
+      if (this.stylesheets[sheet]) {
+        return ScriptLoader.loadStylesheet(this.stylesheets[sheet]);
+      }
+      throw new Error(`Unknown stylesheet: ${sheet}`);
+    });
+
+    await Promise.all(promises);
+  }
+}
+
+/**
+ * PDF generation utility
+ */
+class PDFGenerator {
+  static async generatePDF(options = {}) {
+    const config = {
+      selector: '.terminal-window',
+      filename: 'document.pdf',
+      scale: 1,
+      quality: 0.8,
+      format: 'a4',
+      margin: 10,
+      ...options,
+    };
+
+    await DependencyManager.loadDependencies(['jsPDF', 'html2canvas']);
+
+    const element = DOMUtils.querySelector(config.selector);
+    if (!element) {
+      throw new Error(`Element not found: ${config.selector}`);
+    }
+
+    const canvas = await window.html2canvas(element, {
+      scale: config.scale,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: element.scrollWidth,
+      height: element.scrollHeight,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', config.quality);
+    const pdf = this.createPDF(canvas, config);
+
+    pdf.addImage(imgData, 'JPEG', ...this.calculateDimensions(canvas, config));
+    pdf.save(config.filename);
+  }
+
+  static createPDF(canvas, config) {
+    const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+
+    if (window.jspdf?.jsPDF) {
+      return new window.jspdf.jsPDF({
+        orientation,
+        unit: 'mm',
+        format: config.format,
+      });
+    }
+
+    if (window.jsPDF) {
+      return new window.jsPDF({
+        orientation,
+        unit: 'mm',
+        format: config.format,
+      });
+    }
+
+    throw new Error('jsPDF not available');
+  }
+
+  static calculateDimensions(canvas, config) {
+    const pdfWidth = 210; // A4 width in mm
+    const pdfHeight = 297; // A4 height in mm
+    const pxToMm = 0.264583;
+
+    const availableWidth = pdfWidth - config.margin * 2;
+    const availableHeight = pdfHeight - config.margin * 2;
+
+    const ratio = Math.min(
+      availableWidth / (canvas.width * pxToMm),
+      availableHeight / (canvas.height * pxToMm)
+    );
+
+    const finalWidth = canvas.width * pxToMm * ratio;
+    const finalHeight = canvas.height * pxToMm * ratio;
+    const x = (pdfWidth - finalWidth) / 2;
+    const y = config.margin;
+
+    return [x, y, finalWidth, finalHeight];
+  }
+}
+
+/**
+ * Markdown renderer with sanitization
+ */
+class MarkdownRenderer {
+  static async renderMarkdown(markdown, options = {}) {
+    const config = {
+      removeContactSection: false,
+      targetSelector: '#content',
+      ...options,
+    };
+
+    await DependencyManager.loadDependencies(['marked', 'DOMPurify']);
+
+    let processedMarkdown = markdown;
+    if (config.removeContactSection) {
+      processedMarkdown = this.removeContactSection(processedMarkdown);
+    }
+
+    const html = window.marked.parse(processedMarkdown);
+    const sanitizedHtml = window.DOMPurify.sanitize(html);
+
+    const target = DOMUtils.querySelector(config.targetSelector);
+    if (!target) {
+      throw new Error(`Target element not found: ${config.targetSelector}`);
+    }
+
+    target.innerHTML = sanitizedHtml;
+    this.enhanceAccessibility(target, config.targetSelector);
+  }
+
+  static removeContactSection(markdown) {
+    const contactRegex = /## Contact[\s\S]*?---/;
+    return markdown.replace(contactRegex, '---');
+  }
+
+  static enhanceAccessibility(element, selector) {
+    element.setAttribute('tabindex', '0');
+    element.setAttribute('role', 'main');
+    element.setAttribute('aria-label', 'Markdown content');
+
+    this.addSkipLink(selector);
+  }
+
+  static addSkipLink(selector) {
+    if (DOMUtils.querySelector('.skip-link')) return;
+
+    const skipLink = DOMUtils.createElement('a', {
+      href: selector,
+      className: 'skip-link',
+      textContent: 'Skip to main content',
+    });
+
+    Object.assign(skipLink.style, {
+      position: 'absolute',
+      left: '-999px',
+      top: 'auto',
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden',
+      zIndex: '100',
+    });
+
+    document.body.insertBefore(skipLink, document.body.firstChild);
+  }
+
+  static async fetchAndRender(url, options = {}) {
+    const config = {
+      errorMessage: 'Error loading content',
+      ...options,
+    };
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const markdown = await response.text();
+      await this.renderMarkdown(markdown, config);
+    } catch (error) {
+      this.renderError(
+        config.targetSelector,
+        `${config.errorMessage}: ${error.message}`
+      );
+    }
+  }
+
+  static renderError(targetSelector, message) {
+    const target = DOMUtils.querySelector(targetSelector);
+    if (target) {
+      target.innerHTML = `<div style="color: red; padding: 1em; border: 1px solid red; border-radius: 4px;">${message}</div>`;
+      target.setAttribute('role', 'alert');
+      target.setAttribute('tabindex', '0');
+    }
+  }
+}
+
+/**
+ * Page structure generator
+ */
+class PageBuilder {
+  static createBasicStructure(config) {
+    const { showNavbar = true } = config;
+
+    const html = `
+      ${showNavbar ? '<div id="navbar-container"></div>' : ''}
+      <div class="terminal-window">
+        <article id="content" class="markdown-body terminal-body"></article>
+      </div>
+    `;
+
+    document.body.innerHTML = html;
+  }
+
+  static async setupMetadata(config) {
+    const {
+      title = 'mdsite',
+      description = 'A markdown-based site',
+      author = 'Author',
+      keywords = 'markdown, site',
+    } = config;
+
     document.title = title;
 
-    // Add meta tags if they don't exist
-    if (!document.querySelector('meta[name="description"]')) {
-      const descMeta = document.createElement('meta');
-      descMeta.name = 'description';
-      descMeta.content = description;
-      document.head.appendChild(descMeta);
-    }
+    const metaTags = [
+      { name: 'description', content: description },
+      { name: 'author', content: author },
+      { name: 'keywords', content: keywords },
+    ];
 
-    if (!document.querySelector('meta[name="author"]')) {
-      const authorMeta = document.createElement('meta');
-      authorMeta.name = 'author';
-      authorMeta.content = author;
-      document.head.appendChild(authorMeta);
-    }
+    metaTags.forEach(({ name, content }) => {
+      if (!DOMUtils.querySelector(`meta[name="${name}"]`)) {
+        document.head.appendChild(DOMUtils.createMetaElement(name, content));
+      }
+    });
 
-    if (!document.querySelector('meta[name="keywords"]')) {
-      const keywordsMeta = document.createElement('meta');
-      keywordsMeta.name = 'keywords';
-      keywordsMeta.content = keywords;
-      document.head.appendChild(keywordsMeta);
-    }
-
-    // Add viewport meta if not present
-    if (!document.querySelector('meta[name="viewport"]')) {
-      const viewportMeta = document.createElement('meta');
-      viewportMeta.name = 'viewport';
-      viewportMeta.content = 'width=device-width, initial-scale=1.0';
-      document.head.appendChild(viewportMeta);
+    // Add viewport if not present
+    if (!DOMUtils.querySelector('meta[name="viewport"]')) {
+      const viewport = DOMUtils.createMetaElement(
+        'viewport',
+        'width=device-width, initial-scale=1.0'
+      );
+      document.head.appendChild(viewport);
     }
 
     // Add favicon if not present
-    if (!document.querySelector('link[rel="icon"]')) {
-      const favicon = document.createElement('link');
-      favicon.rel = 'icon';
-      favicon.href = 'https://data.daza.ar/favicon/page.png';
+    if (!DOMUtils.querySelector('link[rel="icon"]')) {
+      const favicon = DOMUtils.createLinkElement(
+        'https://data.daza.ar/favicon/page.png',
+        'icon'
+      );
       favicon.type = 'image/png';
       document.head.appendChild(favicon);
     }
+  }
 
-    // Load external stylesheets
-    const stylesheetPromises = [];
-
-    if (loadGitHubMarkdownCSS) {
-      stylesheetPromises.push(
-        loadStylesheet(
-          'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css'
-        )
-      );
+  static injectCustomCSS(css) {
+    if (css) {
+      document.head.appendChild(DOMUtils.createStyleElement(css));
     }
-
-    if (loadFontAwesome) {
-      stylesheetPromises.push(
-        loadStylesheet(
-          'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
-        )
-      );
-    }
-
-    if (loadFiraMonoFont) {
-      stylesheetPromises.push(
-        loadStylesheet(
-          'https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&display=swap'
-        )
-      );
-    }
-
-    if (showNavbar) {
-      stylesheetPromises.push(
-        loadStylesheet('https://navbar.daza.ar/navbar.css')
-      );
-
-      // Load navbar script
-      await ensureScript('https://navbar.daza.ar/navbar.js', 'initDazaNavbar');
-    }
-
-    // Wait for all stylesheets to load
-    await Promise.all(stylesheetPromises);
-
-    // Inject mdsite CSS if using terminal style
-    if (useTerminalStyle) {
-      const mdsiteCSS = await fetch('https://mdsite.daza.ar/mdsite.css').then(
-        r => r.text()
-      );
-      injectCSS(mdsiteCSS);
-    }
-
-    // Inject custom CSS if provided
-    if (customCSS) {
-      injectCSS(customCSS);
-    }
-
-    // Create HTML structure if body is empty or minimal
-    if (
-      document.body.children.length === 0 ||
-      document.body.innerHTML.trim() === ''
-    ) {
-      const html = `
-        ${showNavbar ? '<div id="navbar-container"></div>' : ''}
-        <div class="terminal-window">
-          <article id="content" class="markdown-body terminal-body"></article>
-        </div>
-      `;
-      injectHTML(html);
-    }
-
-    // Wait a moment for DOM to be ready
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Initialize navbar if enabled
-    if (showNavbar) {
-      // Check if navbar container exists
-      if (!document.querySelector('#navbar-container')) {
-        console.error('Navbar container not found, creating it...');
-        const navbarContainer = document.createElement('div');
-        navbarContainer.id = 'navbar-container';
-        document.body.insertBefore(navbarContainer, document.body.firstChild);
-      }
-
-      initNavbar({
-        showPdfButton,
-        pdfCallbackOptions: {
-          selector: pdfSelector,
-          filename: pdfFilename,
-        },
-        contacts,
-      });
-    }
-
-    // Load and render markdown content if URL provided
-    if (markdownUrl) {
-      // Check if target selector exists
-      let finalTargetSelector = targetSelector;
-      if (!document.querySelector(targetSelector)) {
-        console.error(
-          `Target selector '${targetSelector}' not found, using #content as fallback`
-        );
-        finalTargetSelector = '#content';
-      }
-
-      await fetchAndRenderMarkdown({
-        url: markdownUrl,
-        targetSelector: finalTargetSelector,
-        removeContactSection,
-        errorMessage,
-      });
-    }
-
-    console.log('mdsite initialized successfully');
-  } catch (error) {
-    console.error('Error initializing mdsite:', error);
-    throw error;
   }
 }
+
+/**
+ * Navbar integration
+ */
+class NavbarManager {
+  static async initialize(config) {
+    const {
+      showPdfButton = true,
+      pdfFilename = 'document.pdf',
+      pdfSelector = '.terminal-window',
+      contacts = [],
+    } = config;
+
+    // Ensure navbar script is loaded
+    await ScriptLoader.loadScript(
+      'https://navbar.daza.ar/navbar.js',
+      'initDazaNavbar'
+    );
+
+    // Ensure container exists
+    this.ensureNavbarContainer();
+
+    // Initialize navbar
+    window.initDazaNavbar({
+      showPdfButton,
+      pdfCallback: showPdfButton
+        ? () =>
+            this.handlePdfDownload({
+              filename: pdfFilename,
+              selector: pdfSelector,
+            })
+        : null,
+      contacts,
+    });
+  }
+
+  static ensureNavbarContainer() {
+    if (!DOMUtils.querySelector('#navbar-container')) {
+      const container = DOMUtils.createElement('div', {
+        id: 'navbar-container',
+      });
+      document.body.insertBefore(container, document.body.firstChild);
+    }
+  }
+
+  static async handlePdfDownload(options) {
+    try {
+      await PDFGenerator.generatePDF(options);
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      alert('PDF generation failed. Please try again.');
+    }
+  }
+}
+
+/**
+ * Main application class
+ */
+class MdSite {
+  constructor(config = {}) {
+    this.config = {
+      // Page configuration
+      title: 'mdsite',
+      description: 'A markdown-based site',
+      author: 'Author',
+      keywords: 'markdown, site',
+
+      // Content configuration
+      markdownUrl: null,
+      targetSelector: '#content',
+      removeContactSection: false,
+      errorMessage: 'Error loading content',
+
+      // Navbar configuration
+      showNavbar: true,
+      showPdfButton: true,
+      pdfFilename: 'document.pdf',
+      pdfSelector: '.terminal-window',
+      contacts: [],
+
+      // Styling configuration
+      useTerminalStyle: true,
+      customCSS: '',
+
+      // External dependencies
+      loadFontAwesome: true,
+      loadGitHubMarkdownCSS: true,
+      loadFiraMonoFont: true,
+
+      ...config,
+    };
+  }
+
+  async initialize() {
+    try {
+      await DOMUtils.waitForDOM();
+      await this.setupPage();
+      await this.loadResources();
+      await this.initializeComponents();
+
+      console.log('mdsite initialized successfully');
+    } catch (error) {
+      console.error('Error initializing mdsite:', error);
+      throw error;
+    }
+  }
+
+  async setupPage() {
+    await PageBuilder.setupMetadata(this.config);
+    PageBuilder.createBasicStructure(this.config);
+  }
+
+  async loadResources() {
+    const stylesheets = [];
+
+    if (this.config.loadGitHubMarkdownCSS) stylesheets.push('githubMarkdown');
+    if (this.config.loadFontAwesome) stylesheets.push('fontAwesome');
+    if (this.config.loadFiraMonoFont) stylesheets.push('firaFont');
+    if (this.config.showNavbar) stylesheets.push('navbar');
+    if (this.config.useTerminalStyle) stylesheets.push('mdsite');
+
+    await DependencyManager.loadStylesheets(stylesheets);
+    PageBuilder.injectCustomCSS(this.config.customCSS);
+  }
+
+  async initializeComponents() {
+    if (this.config.showNavbar) {
+      await NavbarManager.initialize(this.config);
+    }
+
+    if (this.config.markdownUrl) {
+      await MarkdownRenderer.fetchAndRender(this.config.markdownUrl, {
+        targetSelector: this.config.targetSelector,
+        removeContactSection: this.config.removeContactSection,
+        errorMessage: this.config.errorMessage,
+      });
+    }
+  }
+}
+
+// Legacy exports for backward compatibility
+export async function initMdsite(config = {}) {
+  const site = new MdSite(config);
+  await site.initialize();
+}
+
+export async function fetchAndRenderMarkdown(options = {}) {
+  await MarkdownRenderer.fetchAndRender(options.url, options);
+}
+
+export function renderMarkdown(options = {}) {
+  return MarkdownRenderer.renderMarkdown(options.markdown, options);
+}
+
+export async function initNavbar(config = {}) {
+  await NavbarManager.initialize(config);
+}
+
+export const DownloadPdfUtil = {
+  async download(options = {}) {
+    await PDFGenerator.generatePDF(options);
+  },
+};
+
+// Default export
+export default MdSite;
